@@ -1,0 +1,212 @@
+{
+  "info": {
+    "name": "Template Gestionale API",
+    "description": "Collection per testare le API del backend Express.\n\nCome usarla:\n1. Postman → File → Import → seleziona questo file.\n2. La variabile `baseUrl` punta a http://localhost:3000: per testare il deploy cambiala con il dominio Railway (tab Variables della collection).\n3. Esegui `Auth / Login`: il token JWT viene salvato automaticamente nella variabile `token` e usato da tutte le rotte protette.\n\nCredenziali di test (create da `npm run seed`): admin@test.it / Admin123! — utente@test.it / Utente123!\n\nQuando aggiungi una risorsa al progetto, aggiungi qui la sua cartella di richieste (vedi ADDING_A_RESOURCE.md).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.ok && res.token) {",
+                  "    pm.collectionVariables.set('token', res.token);",
+                  "    console.log('Token salvato nella variabile {{token}}');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Mario\",\n    \"last_name\": \"Rossi\",\n    \"email\": \"mario.rossi@test.it\",\n    \"password\": \"Password123!\",\n    \"repeatPassword\": \"Password123!\",\n    \"isAdmin\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Registrazione pubblica. Salva automaticamente il token restituito."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.ok && res.token) {",
+                  "    pm.collectionVariables.set('token', res.token);",
+                  "    console.log('Token salvato nella variabile {{token}}');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@test.it\",\n    \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login. Salva automaticamente il token nella variabile della collection: le altre richieste lo usano via Bearer."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Dati dell'utente autenticato (dal token). Protetta."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Logout stateless: risponde ok, l'invalidazione del token è a carico del client."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users (solo admin)",
+      "description": "Tutte le rotte richiedono token di un utente admin (fai prima Login con admin@test.it).",
+      "item": [
+        {
+          "name": "Lista utenti",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Dettaglio utente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "uuid dell'utente" }]
+            }
+          }
+        },
+        {
+          "name": "Crea utente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Luigi\",\n    \"last_name\": \"Verdi\",\n    \"email\": \"luigi.verdi@test.it\",\n    \"password\": \"Password123!\",\n    \"isAdmin\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Aggiorna utente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Luigi\",\n    \"last_name\": \"Verdi\",\n    \"email\": \"luigi.verdi@test.it\",\n    \"isAdmin\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "uuid dell'utente" }]
+            },
+            "description": "password opzionale: aggiungerla al body solo per cambiarla."
+          }
+        },
+        {
+          "name": "Elimina utente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "uuid dell'utente" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Utility",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Verifica che il server sia su. Pubblica."
+          }
+        }
+      ]
+    }
+  ]
+}
