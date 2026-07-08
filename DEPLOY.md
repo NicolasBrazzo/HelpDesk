@@ -72,9 +72,10 @@ npm run seed
 Checklist (dall'URL Vercel, in incognito):
 
 - [ ] `https://<railway>/health` risponde `{"status":"ok"}`
-- [ ] Registrazione di un nuovo utente (nome, cognome, email, password) funziona
-- [ ] Logout e login con le credenziali di test del seed (`admin@test.it` / `Admin123!`)
-- [ ] Da admin: pagina Utenti visibile e CRUD funzionante
+- [ ] Registrazione di un nuovo utente (nome, cognome, email, password, ruolo) funziona
+- [ ] Logout e login con le credenziali di test del seed (`admin@test.it` / `Admin123!` = tecnico; `utente@test.it` / `Utente123!` = richiedente)
+- [ ] Da richiedente: apertura di un ticket, con modifica/eliminazione consentite solo finché è Aperto
+- [ ] Da tecnico: elenco di tutti i ticket, presa in carico / risoluzione / rifiuto e pagina statistiche
 - [ ] Refresh del browser su `/dashboard` → nessun 404
 - [ ] Collection Postman: cambia `baseUrl` con l'URL Railway e verifica login + una rotta protetta
 

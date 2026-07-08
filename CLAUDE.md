@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Full-stack management-app **template**: it ships only the universal infrastructure (auth, admin user management, reusable hooks/components) and is meant to be cloned as the starting point for any new gestionale. Domain resources (anagrafiche, orders, …) are added per project following the recipe in [`ADDING_A_RESOURCE.md`](ADDING_A_RESOURCE.md).
+Full-stack **helpdesk / ticket-management app** — *"Gestione dei ticket di assistenza tecnica"*. Requesters (*utenti richiedenti*) open support tickets; support technicians (*tecnici di supporto*) take them in charge, resolve or reject them, and consult aggregate statistics. It is built on a reusable management-app template that ships the universal infrastructure (JWT auth, user management, reusable hooks/components); the ticket domain (categories + tickets) is added on top following the recipe in [`ADDING_A_RESOURCE.md`](ADDING_A_RESOURCE.md) and the copy-ready recipes in [`PATTERNS.md`](PATTERNS.md).
 
-Monorepo with two independently-installed packages: `client/` (React SPA) and `server/` (Express REST API backed by Supabase/PostgreSQL). There is no root `package.json` — install and run each side separately. User-facing strings and code comments are in Italian.
+Monorepo with two independently-installed packages: `client/` (React SPA) and `server/` (Express REST API backed by Supabase/PostgreSQL). There is no root `package.json` — install and run each side separately. User-facing strings and code comments are in Italian; database table and column names are in English with the `hd_` prefix.
 
 Deployment (Railway for the server, Vercel for the client) is documented step-by-step in [`DEPLOY.md`](DEPLOY.md).
 
@@ -17,8 +17,8 @@ Deployment (Railway for the server, Vercel for the client) is documented step-by
 - Every time you make a change to the database, record it in `server/database/CHANGELOG.md`, tagged with the sequential change number (`#001`, `#002`, …). Keep `schema.md` and `schema.sql` in sync as well — they are maintained by hand.
 
 **New resources:**
-- To add a new resource (table + endpoints + page), follow the step-by-step recipe in [`ADDING_A_RESOURCE.md`](ADDING_A_RESOURCE.md). The live reference implementation of the full pattern is the **Users** resource (`server/controllers/users.controller.js` + `client/src/pages/Users.jsx`).
-- For domain patterns beyond plain CRUD — FK joins in lists, query-string filters, ownership checks, status transitions, statistics/aggregations — use the copy-ready recipes in [`PATTERNS.md`](PATTERNS.md).
+- To add a new resource (table + endpoints + page), follow the step-by-step recipe in [`ADDING_A_RESOURCE.md`](ADDING_A_RESOURCE.md). The live reference implementation of the full CRUD pattern is the **Users** resource (`server/controllers/users.controller.js` + `client/src/pages/Users.jsx`) — copy it when building the **Tickets** and **Categories** resources.
+- For the domain patterns this app relies on — FK joins in lists (ticket → category, requester, technician), query-string filters (status/category/priority/month/requester), ownership checks (a requester sees only their own tickets), status transitions (`open → in_progress → resolved`, `open|in_progress → rejected`), statistics/aggregations — use the copy-ready recipes in [`PATTERNS.md`](PATTERNS.md).
 
 **Endpoints:**
 - Whenever you need to consult the API to debug an issue or to add/modify routes, always read [`server/ENDPOINTS.md`](server/ENDPOINTS.md) first — it is the reference for every backend route.
@@ -37,7 +37,7 @@ Run these from inside `client/` or `server/` respectively.
 **Server** (`server/`):
 - `npm run dev` — nodemon (auto-reload) on `server.js`
 - `npm start` — plain `node server.js`
-- `npm run seed` — seeds test users (idempotent; credentials listed in `server/ENDPOINTS.md`). Domain entities get added to `server/database/seed.js` per project.
+- `npm run seed` — seeds test users, one technician + one requester (idempotent; credentials listed in `server/ENDPOINTS.md`). Domain seed data (categories + sample tickets with different statuses, for filters/statistics) gets added to `server/database/seed.js` as those resources are built.
 
 There is no test suite in either package.
 
@@ -52,28 +52,30 @@ Both sides require `.env` files (copy from the committed `.env.example`); the ap
 
 Layered, CommonJS. Request flows: **route/controller → model → Supabase**.
 
-- `server.js` — app entry. Mounts two routers under `/auth` and `/users`; plus `/health`, a 404 handler, and a global error handler. New resource routers get mounted here.
+- `server.js` — app entry. Mounts routers under `/auth` and `/users`; plus `/health`, a 404 handler, and a global error handler. The domain routers (tickets, categories, statistics) get mounted here as they are built.
 - `controllers/*.controller.js` — these ARE the Express routers (each exports `express.Router()`), not thin controllers. They own routing, input validation, business rules, and HTTP responses. Business logic lives here, not in models.
 - `models/*.model.js` — pure Supabase data access. Every function queries a table (name in a `TABLE_NAME` constant at the top) and throws a sentinel `Error("DATABASE_*_ERROR")` on failure. No validation or HTTP concerns.
 - `config/db_connection.js` — single shared Supabase client (exported as `supabase`), imported by all models.
 - `config/jwt.js` — centralizes JWT secret/expiry/salt config.
 - `middleware/auth.js` — exported as `protect`. Verifies `Authorization: Bearer <token>`, attaches decoded payload (`{ sub, email, isAdmin, first_name, last_name }`) to `req.user`. Applied per-route, not globally.
-- `middleware/isAdmin.js` — admin guard, used after `protect` (checks `req.user.isAdmin`, else 403).
+- `middleware/isAdmin.js` — role guard, used after `protect` (checks `req.user.isAdmin`, else 403). In this app `isAdmin` means **support technician**, so this guard protects the technician-only routes (take-in-charge, resolve, reject, statistics).
 - `utils/validate*.js` — standalone validators reused across controllers (`validateEmail`, `validatePassword`, `validateName`). Also includes ready-to-use Italian business validators (`validateCodiceFiscale`, `validatePartitaIva`, `validatePhoneNumber`) even where not yet wired to a route.
 
 **Conventions to follow when adding endpoints:**
 - Every response is JSON shaped `{ ok: true, ... }` or `{ ok: false, error }`. `error` is usually a string but can be an **array** (e.g. `validatePassword` returns a list of failures) — the client joins arrays with `; `.
-- Protected routes: pass `protect` as route middleware. Admin-only routes additionally use `isAdmin` (`middleware/isAdmin.js`).
+- Protected routes: pass `protect` as route middleware. Technician-only routes additionally use `isAdmin` (`middleware/isAdmin.js`).
 - Validate in the controller, then delegate persistence to the model.
 - Error strings are Italian and returned to the user.
 
-**Data model** (see `server/database/schema.sql` + `schema.md`, kept in sync manually — they are reconstructed from app code, NOT exported from Supabase; changes are logged in `server/database/CHANGELOG.md`):
-- `T_Users` (uuid id, email unique, bcrypt password, isAdmin bool, first_name, last_name, created_at) — the only base table of the template.
-- Table-name prefix (`T_` in the template) is a per-project convention; new tables follow the column conventions in `schema.md` (uuid PK + `created_at`).
+**Data model** (see `server/database/schema.sql` + `schema.md`, kept in sync manually — they are reconstructed from app code, NOT exported from Supabase; changes are logged in `server/database/CHANGELOG.md`). All tables use the `hd_` prefix and English identifiers:
+- `hd_users` (uuid id, email unique, bcrypt password, `isAdmin` bool, first_name, last_name, created_at). `isAdmin = true` → **Tecnico di supporto**, `false` → **Utente richiedente**.
+- `hd_categories` (uuid id, description unique, created_at) — ticket categories, read-only for the app (`GET /api/categorie`), seeded with realistic values.
+- `hd_tickets` (uuid id, title, description, category_id FK, priority, status, requester_id FK, assigned_technician_id FK, taken_in_charge_at, resolved_at, worked_hours, resolution_note, rejection_reason, created_at = **opening date**). Statuses `open|in_progress|resolved|rejected`; priorities `low|medium|high|urgent`; key CHECK/date constraints documented in `schema.md`.
+- ⚠️ **Migration note:** template code still uses `TABLE_NAME = "T_Users"` (`server/models/user.model.js`, `server/database/seed.js`); align it to `"hd_users"` when building this project's models/seed.
 
 ## Auth model
 
-Stateless JWT. Login/register return a token; the client stores it in `localStorage` and sends it via an Axios request interceptor. `logout` is client-side only (removes the token). Public `/auth/register` requires `first_name`, `last_name` (validated with `validateName`: non-empty, min 2 chars after trim), `email`, `password`, `repeatPassword`, and accepts an optional `isAdmin` boolean (default `false`) with **no restriction** — anyone can self-register as admin. This is a deliberate template/dev convenience: projects derived from the template must lock it down (registration code, whitelist, or drop the field). Admins can also be created/promoted through the admin-guarded `/users` endpoints.
+Stateless JWT. Login/register return a token; the client stores it in `localStorage` and sends it via an Axios request interceptor. `logout` is client-side only (removes the token). Public `/auth/register` requires `first_name`, `last_name` (validated with `validateName`: non-empty, min 2 chars after trim), `email`, `password`, `repeatPassword`, and accepts an optional `isAdmin` boolean (default `false`). Here **`isAdmin` is the role**: `true` = Tecnico di supporto, `false` = Utente richiedente — registration lets the user pick the role, which the track explicitly allows for the simulation ("*è ammesso che la registrazione consenta di scegliere il ruolo*"). There is no restriction on self-registering as a technician: acceptable for the exam simulation (and it lets a grader test every role), but call it out in the consegna. Technicians can also be created/promoted through the technician-guarded `/users` endpoints.
 
 ## Frontend architecture
 

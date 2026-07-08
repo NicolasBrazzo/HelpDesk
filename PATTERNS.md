@@ -1,56 +1,68 @@
 # Pattern di dominio — ricette pronte
 
-Ricette con codice copiabile per i 5 pattern che ogni gestionale (e ogni
-traccia d'esame) richiede e che non sono cablati nel template:
+Ricette con codice copiabile per i 5 pattern che questo gestionale (gestione
+ticket di assistenza) richiede e che non sono cablati nel template:
 
 1. [FK + join nelle liste](#1-fk--join-nelle-liste)
 2. [Filtri via query-string](#2-filtri-via-query-string)
-3. [Ownership (ogni utente vede solo il suo)](#3-ownership)
+3. [Ownership (il richiedente vede solo i suoi ticket)](#3-ownership)
 4. [Transizioni di stato](#4-transizioni-di-stato)
 5. [Statistiche / aggregazioni](#5-statistiche--aggregazioni)
 
 Tutte seguono le convenzioni del template (vedi `CLAUDE.md` e
 `ADDING_A_RESOURCE.md`): controller = router Express con validazioni e
 risposte `{ ok, error }`, model = solo accesso Supabase con sentinel error.
-Gli esempi usano una risorsa `T_Requests` (richieste) con categoria e owner —
-adattare i nomi al dominio della traccia.
+Gli esempi usano le risorse reali del progetto — `hd_tickets` (i ticket) e
+`hd_categories` (le categorie) — così come definite in
+[`server/database/schema.sql`](server/database/schema.sql).
+
+Promemoria ruoli: `isAdmin = true` → **Tecnico di supporto**, `isAdmin = false`
+→ **Utente richiedente**.
 
 ---
 
-## Tabella di esempio usata dalle ricette
+## Tabelle usate dalle ricette
+
+Sono le tabelle di dominio dell'app (già in `schema.sql`):
 
 ```sql
-create table if not exists "T_Categories" (
-    "id"          uuid primary key default gen_random_uuid(),
-    "description" text not null,
+create table if not exists "hd_categories" (
+    "id"          uuid        primary key default gen_random_uuid(),
+    "description" text        not null unique,
     "created_at"  timestamptz not null default now()
 );
 
-create table if not exists "T_Requests" (
-    "id"            uuid primary key default gen_random_uuid(),
-    "user_id"       uuid not null references "T_Users"("id"),
-    "category_id"   uuid not null references "T_Categories"("id"),
-    "amount"        numeric(10,2) not null check ("amount" > 0),
-    "description"   text not null,
-    "expense_date"  date not null,
-    "status"        text not null default 'in_attesa'
-                    check ("status" in ('in_attesa','approvata','rifiutata','liquidata')),
-    "evaluated_at"  timestamptz,
-    "evaluated_by"  uuid references "T_Users"("id"),
-    "reject_reason" text,
-    "paid_at"       timestamptz,
-    "created_at"    timestamptz not null default now()
+create table if not exists "hd_tickets" (
+    "id"                     uuid         primary key default gen_random_uuid(),
+    "title"                  text         not null,
+    "description"            text         not null,
+    "category_id"            uuid         not null references "hd_categories"("id"),
+    "priority"               text         not null
+                                          check ("priority" in ('low','medium','high','urgent')),
+    "status"                 text         not null default 'open'
+                                          check ("status" in ('open','in_progress','resolved','rejected')),
+    "requester_id"           uuid         not null references "hd_users"("id"),
+    "assigned_technician_id" uuid         references "hd_users"("id"),
+    "taken_in_charge_at"     timestamptz,
+    "resolved_at"            timestamptz,
+    "worked_hours"           numeric(6,2) check ("worked_hours" is null or "worked_hours" > 0),
+    "resolution_note"        text,
+    "rejection_reason"       text,
+    "created_at"             timestamptz  not null default now()
 );
 
--- Indici sui campi usati da filtri e lookup
-create index if not exists idx_requests_user     on "T_Requests"("user_id");
-create index if not exists idx_requests_status   on "T_Requests"("status");
-create index if not exists idx_requests_category on "T_Requests"("category_id");
+create index if not exists idx_tickets_requester  on "hd_tickets"("requester_id");
+create index if not exists idx_tickets_technician on "hd_tickets"("assigned_technician_id");
+create index if not exists idx_tickets_status     on "hd_tickets"("status");
+create index if not exists idx_tickets_category   on "hd_tickets"("category_id");
+create index if not exists idx_tickets_created_at on "hd_tickets"("created_at");
 ```
 
 > Le colonne `references` sono ciò che abilita la sintassi di join di
-> supabase-js qui sotto: **senza FK il join non funziona**. Ricordarsi di
-> registrare le tabelle in `schema.sql`, `schema.md` e `CHANGELOG.md`.
+> supabase-js qui sotto: **senza FK il join non funziona**. `hd_tickets` ha
+> **due** FK verso `hd_users` (richiedente e tecnico): nel `select()` vanno
+> disambiguate indicando la colonna FK — `requester:requester_id(...)` e
+> `technician:assigned_technician_id(...)`.
 
 ---
 
@@ -60,26 +72,28 @@ supabase-js segue le FK con la sintassi `alias:colonna_fk(campi)` dentro
 `select()`. Nel model:
 
 ```js
-// models/request.model.js
+// models/ticket.model.js
 const supabase = require("../config/db_connection");
 
-const TABLE_NAME = "T_Requests";
+const TABLE_NAME = "hd_tickets";
 
 // Campi delle tabelle collegate direttamente nella lista
 const SELECT_WITH_JOINS = `
-  id, amount, description, expense_date, status, evaluated_at, paid_at, created_at,
+  id, title, description, priority, status, created_at,
+  taken_in_charge_at, resolved_at, worked_hours, resolution_note, rejection_reason,
   category:category_id ( id, description ),
-  user:user_id ( id, first_name, last_name, email )
+  requester:requester_id ( id, first_name, last_name, email ),
+  technician:assigned_technician_id ( id, first_name, last_name, email )
 `;
 
-const findAllRequests = async () => {
+const findAllTickets = async () => {
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select(SELECT_WITH_JOINS)
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error("DATABASE_FIND_ALL_REQUESTS_ERROR");
+    throw new Error("DATABASE_FIND_ALL_TICKETS_ERROR");
   }
   return data;
 };
@@ -90,10 +104,12 @@ Ogni riga arriva con gli oggetti annidati:
 ```json
 {
   "id": "…",
-  "amount": 42.5,
-  "status": "in_attesa",
-  "category": { "id": "…", "description": "Trasferta" },
-  "user": { "id": "…", "first_name": "Ugo", "last_name": "Utente" }
+  "title": "PC non si accende",
+  "priority": "high",
+  "status": "open",
+  "category": { "id": "…", "description": "Hardware" },
+  "requester": { "id": "…", "first_name": "Ugo", "last_name": "Utente" },
+  "technician": null
 }
 ```
 
@@ -107,9 +123,17 @@ sono ordinabili con `sortByField`, che legge campi piatti):
   render: (item) => item.category?.description ?? "—",
 },
 {
-  key: "user",
-  label: "Dipendente",
-  render: (item) => `${item.user?.first_name ?? ""} ${item.user?.last_name ?? ""}`,
+  key: "requester",
+  label: "Richiedente",
+  render: (item) => `${item.requester?.first_name ?? ""} ${item.requester?.last_name ?? ""}`,
+},
+{
+  key: "technician",
+  label: "Tecnico",
+  render: (item) =>
+    item.technician
+      ? `${item.technician.first_name} ${item.technician.last_name}`
+      : "—",
 },
 ```
 
@@ -120,31 +144,49 @@ sono ordinabili con `sortByField`, che legge campi piatti):
 Il controller legge `req.query`, valida/normalizza e passa un oggetto
 `filters` al model. Il model aggiunge le condizioni **solo se presenti**.
 
+Filtri richiesti dalla traccia: **stato, categoria, priorità, mese** e, per i
+tecnici, **richiedente**.
+
 ```js
-// controllers/requests.controller.js
+// controllers/ticket.controller.js
+const STATUSES = ["open", "in_progress", "resolved", "rejected"];
+const PRIORITIES = ["low", "medium", "high", "urgent"];
+
 router.get("/", protect, async (req, res) => {
   try {
-    const { status, categoryId, month } = req.query;
+    const { status, categoryId, priority, month } = req.query;
 
-    if (status && !["in_attesa", "approvata", "rifiutata", "liquidata"].includes(status)) {
+    if (status && !STATUSES.includes(status)) {
       return res.status(400).json({ ok: false, error: "Stato non valido" });
+    }
+    if (priority && !PRIORITIES.includes(priority)) {
+      return res.status(400).json({ ok: false, error: "Priorità non valida" });
     }
     if (month && !/^\d{4}-\d{2}$/.test(month)) {
       return res.status(400).json({ ok: false, error: "Mese non valido (formato YYYY-MM)" });
     }
 
-    const requests = await findAllRequests({ status, categoryId, month });
-    return res.status(200).json({ ok: true, requests });
+    const filters = { status, categoryId, priority, month };
+
+    // ownership + filtro richiedente (vedi pattern 3)
+    if (req.user.isAdmin) {
+      if (req.query.requesterId) filters.requesterId = req.query.requesterId;
+    } else {
+      filters.requesterId = req.user.sub;
+    }
+
+    const tickets = await findAllTickets(filters);
+    return res.status(200).json({ ok: true, tickets });
   } catch (err) {
-    console.error("GET ALL REQUESTS ERROR:", err);
+    console.error("GET ALL TICKETS ERROR:", err);
     return res.status(500).json({ ok: false, error: "Errore interno del server" });
   }
 });
 ```
 
 ```js
-// models/request.model.js — query costruita condizionalmente
-const findAllRequests = async (filters = {}) => {
+// models/ticket.model.js — query costruita condizionalmente
+const findAllTickets = async (filters = {}) => {
   let query = supabase
     .from(TABLE_NAME)
     .select(SELECT_WITH_JOINS)
@@ -152,38 +194,38 @@ const findAllRequests = async (filters = {}) => {
 
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
-  if (filters.userId) query = query.eq("user_id", filters.userId);
+  if (filters.priority) query = query.eq("priority", filters.priority);
+  if (filters.requesterId) query = query.eq("requester_id", filters.requesterId);
+  if (filters.technicianId) query = query.eq("assigned_technician_id", filters.technicianId);
 
-  // month = "YYYY-MM" → intervallo [primo del mese, primo del mese dopo)
+  // month = "YYYY-MM" → intervallo [primo del mese, primo del mese dopo) sulla data di apertura
   if (filters.month) {
-    const [year, month] = filters.month.split("-").map(Number);
-    const from = `${filters.month}-01`;
-    const to = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
-    query = query.gte("expense_date", from).lt("expense_date", to);
+    const [year, m] = filters.month.split("-").map(Number);
+    const from = new Date(Date.UTC(year, m - 1, 1)).toISOString();
+    const to = new Date(Date.UTC(year, m, 1)).toISOString();
+    query = query.gte("created_at", from).lt("created_at", to);
   }
 
   const { data, error } = await query;
   if (error) {
-    throw new Error("DATABASE_FIND_ALL_REQUESTS_ERROR");
+    throw new Error("DATABASE_FIND_ALL_TICKETS_ERROR");
   }
   return data;
 };
 ```
 
-Lato client: il service passa i filtri come `params` (Axios li serializza e
-omette i valori vuoti va gestito prima), la pagina usa `FilterBar` +
-`useFetch` con i filtri nelle deps:
+Lato client: il service passa i filtri come `params` (rimuovendo i vuoti), la
+pagina usa `FilterBar` + `useFetch` con i filtri nelle deps:
 
 ```js
-// services/requestService.js
-export const fetchRequests = async (filters = {}) => {
+// services/ticketService.js
+export const fetchTickets = async (filters = {}) => {
   try {
-    // rimuove i filtri vuoti per non sporcare la query string
     const params = Object.fromEntries(
       Object.entries(filters).filter(([, v]) => v !== "" && v != null),
     );
-    const res = await api.get("/requests", { params });
-    return res.data.requests;
+    const res = await api.get("/ticket", { params });
+    return res.data.tickets;
   } catch (err) {
     throw new Error(err.message);
   }
@@ -197,181 +239,200 @@ const FILTERS = [
     key: "status",
     label: "Stato",
     options: [
-      { value: "in_attesa", label: "In attesa" },
-      { value: "approvata", label: "Approvata" },
-      { value: "rifiutata", label: "Rifiutata" },
-      { value: "liquidata", label: "Liquidata" },
+      { value: "open", label: "Aperto" },
+      { value: "in_progress", label: "In lavorazione" },
+      { value: "resolved", label: "Risolto" },
+      { value: "rejected", label: "Rifiutato" },
+    ],
+  },
+  {
+    key: "priority",
+    label: "Priorità",
+    options: [
+      { value: "low", label: "Bassa" },
+      { value: "medium", label: "Media" },
+      { value: "high", label: "Alta" },
+      { value: "urgent", label: "Urgente" },
     ],
   },
   { key: "month", label: "Mese", type: "month" },
 ];
 
-const [filters, setFilters] = useState({ status: "", month: "" });
-const { data: requests, isLoading, error, refetch } = useFetch(
-  () => fetchRequests(filters),
+const [filters, setFilters] = useState({ status: "", priority: "", categoryId: "", month: "" });
+const { data: tickets, isLoading, error, refetch } = useFetch(
+  () => fetchTickets(filters),
   [filters],   // al cambio filtro la chiamata riparte da sola
 );
 
 <FilterBar filters={FILTERS} values={filters} onChange={setFilters} />
 ```
 
-Per un filtro a opzioni dinamiche (es. le categorie), caricare le opzioni con
-un secondo `useFetch` e costruire `FILTERS` da quelle.
+Il filtro **categoria** ha opzioni dinamiche: caricale con un secondo
+`useFetch` da `GET /api/categorie` e costruisci quella voce di `FILTERS` dalle
+categorie. Il filtro **richiedente** (solo tecnico) si popola allo stesso modo
+dagli utenti.
 
 ---
 
 ## 3. Ownership
 
-"Un utente vede/modifica solo le proprie risorse; l'admin le vede tutte."
+"Il richiedente vede/modifica solo i propri ticket; il tecnico li vede tutti."
 I controlli stanno **nel controller, lato server** (nascondere i bottoni nel
 frontend non basta — è il primo punto che un valutatore verifica).
 
-**Lista scoped** — l'utente normale è forzato sulle proprie righe, il filtro
-`userId` libero è riservato all'admin:
+**Lista scoped** — il richiedente è forzato sui propri ticket, il filtro
+`requesterId` libero è riservato al tecnico (vedi pattern 2):
 
 ```js
-router.get("/", protect, async (req, res) => {
-  try {
-    const filters = { /* …filtri da req.query… */ };
-
-    if (req.user.isAdmin) {
-      // l'admin può filtrare per utente specifico (o vederli tutti)
-      if (req.query.userId) filters.userId = req.query.userId;
-    } else {
-      // l'utente normale vede SOLO le proprie, qualunque cosa passi in query
-      filters.userId = req.user.sub;
-    }
-
-    const requests = await findAllRequests(filters);
-    return res.status(200).json({ ok: true, requests });
-  } catch (err) { /* … */ }
-});
+if (req.user.isAdmin) {
+  // il tecnico può filtrare per richiedente specifico (o vederli tutti)
+  if (req.query.requesterId) filters.requesterId = req.query.requesterId;
+} else {
+  // il richiedente vede SOLO i propri, qualunque cosa passi in query
+  filters.requesterId = req.user.sub;
+}
 ```
 
-**Dettaglio / modifica / eliminazione** — carica la risorsa, poi verifica il
-proprietario. 404 (non 403) per non rivelare l'esistenza di risorse altrui:
+**Dettaglio / modifica / eliminazione** — carica il ticket, poi verifica il
+proprietario. 404 (non 403) per non rivelare l'esistenza di ticket altrui:
 
 ```js
 router.put("/:id", protect, async (req, res) => {
   try {
-    const request = await findRequestById(req.params.id);
-    if (!request) {
-      return res.status(404).json({ ok: false, error: "Richiesta non trovata" });
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ ok: false, error: "Ticket non trovato" });
     }
 
-    if (!req.user.isAdmin && request.user_id !== req.user.sub) {
-      return res.status(404).json({ ok: false, error: "Richiesta non trovata" });
+    // il richiedente può toccare solo i propri ticket
+    if (!req.user.isAdmin && ticket.requester_id !== req.user.sub) {
+      return res.status(404).json({ ok: false, error: "Ticket non trovato" });
     }
 
+    // …e solo finché è ancora Aperto (vedi pattern 4)…
     // …validazioni e update…
   } catch (err) { /* … */ }
 });
 ```
 
-**Alla creazione** l'owner viene sempre dal token, mai dal body:
+**Alla creazione** il richiedente viene sempre dal token, mai dal body, e lo
+stato iniziale è `open`:
 
 ```js
-const request = await createNewRequest({ ...validatedData, user_id: req.user.sub });
+const ticket = await createNewTicket({
+  ...validatedData,
+  requester_id: req.user.sub,
+  status: "open",
+});
 ```
 
 ---
 
 ## 4. Transizioni di stato
 
-Stati come `in_attesa → approvata|rifiutata`, `approvata → liquidata`.
-Tre ingredienti: il vincolo `CHECK` sul DB (vedi tabella di esempio), una
-mappa delle transizioni valide e rotte azione dedicate.
+Gli stati del ticket sono `open → in_progress → resolved`, con
+`open | in_progress → rejected`. Tre ingredienti: il vincolo `CHECK` sul DB
+(già in `schema.sql`), una mappa delle transizioni valide e rotte azione
+dedicate, riservate al tecnico (`isAdmin`).
 
 ```js
-// controllers/requests.controller.js
-const STATUSES = ["in_attesa", "approvata", "rifiutata", "liquidata"];
+// controllers/ticket.controller.js
+const STATUSES = ["open", "in_progress", "resolved", "rejected"];
 
 // da → a: transizioni ammesse
 const VALID_TRANSITIONS = {
-  in_attesa: ["approvata", "rifiutata"],
-  approvata: ["liquidata"],
-  rifiutata: [],
-  liquidata: [],
+  open: ["in_progress", "rejected"],
+  in_progress: ["resolved", "rejected"],
+  resolved: [],
+  rejected: [],
 };
 
-// Helper condiviso dalle tre rotte azione
+const STATUS_LABELS = {
+  open: "Aperto",
+  in_progress: "In lavorazione",
+  resolved: "Risolto",
+  rejected: "Rifiutato",
+};
+
+// Helper condiviso dalle rotte azione
 const transition = async (req, res, targetStatus, extraFields = {}) => {
   try {
-    const request = await findRequestById(req.params.id);
-    if (!request) {
-      return res.status(404).json({ ok: false, error: "Richiesta non trovata" });
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ ok: false, error: "Ticket non trovato" });
     }
 
-    if (!VALID_TRANSITIONS[request.status].includes(targetStatus)) {
+    if (!VALID_TRANSITIONS[ticket.status].includes(targetStatus)) {
       return res.status(409).json({
         ok: false,
-        error: `Una richiesta ${request.status.replace("_", " ")} non può diventare ${targetStatus}`,
+        error: `Un ticket ${STATUS_LABELS[ticket.status]} non può passare a ${STATUS_LABELS[targetStatus]}`,
       });
     }
 
-    const updated = await updateRequestById(request.id, {
+    const updated = await updateTicketById(ticket.id, {
       status: targetStatus,
       ...extraFields,
     });
-    return res.status(200).json({ ok: true, request: updated });
+    return res.status(200).json({ ok: true, ticket: updated });
   } catch (err) {
     console.error("TRANSITION ERROR:", err);
     return res.status(500).json({ ok: false, error: "Errore interno del server" });
   }
 };
 
-// Rotte azione: PUT /:id/<azione>, riservate all'admin
-router.put("/:id/approva", protect, isAdmin, (req, res) =>
-  transition(req, res, "approvata", {
-    evaluated_at: new Date().toISOString(),
-    evaluated_by: req.user.sub,
+// Presa in carico: assegna il ticket al tecnico corrente
+router.put("/:id/prendi-in-carico", protect, isAdmin, (req, res) =>
+  transition(req, res, "in_progress", {
+    assigned_technician_id: req.user.sub,
+    taken_in_charge_at: new Date().toISOString(),
   }),
 );
 
-router.put("/:id/rifiuta", protect, isAdmin, (req, res) =>
-  transition(req, res, "rifiutata", {
-    evaluated_at: new Date().toISOString(),
-    evaluated_by: req.user.sub,
-    reject_reason: req.body.reason || null,
-  }),
-);
+// Risoluzione: richiede ore lavorate (> 0) e nota di chiusura
+router.put("/:id/risolvi", protect, isAdmin, async (req, res) => {
+  const workedHours = Number(req.body.worked_hours);
+  if (!Number.isFinite(workedHours) || workedHours <= 0) {
+    return res.status(400).json({ ok: false, error: "Le ore lavorate devono essere maggiori di zero" });
+  }
+  if (req.body.resolution_note && !req.body.resolution_note.trim()) {
+    return res.status(400).json({ ok: false, error: "La nota di risoluzione non può essere vuota" });
+  }
+  return transition(req, res, "resolved", {
+    resolved_at: new Date().toISOString(),
+    worked_hours: workedHours,
+    resolution_note: req.body.resolution_note?.trim() || null,
+  });
+});
 
-router.put("/:id/liquida", protect, isAdmin, (req, res) =>
-  transition(req, res, "liquidata", { paid_at: new Date().toISOString() }),
-);
+// Rifiuto: richiede una motivazione
+router.put("/:id/rifiuta", protect, isAdmin, async (req, res) => {
+  const reason = (req.body.rejection_reason || "").trim();
+  if (!reason) {
+    return res.status(400).json({ ok: false, error: "La motivazione di rifiuto è obbligatoria" });
+  }
+  return transition(req, res, "rejected", { rejection_reason: reason });
+});
 ```
 
-**Regole collegate** che le tracce chiedono quasi sempre:
+**Regole collegate** che la traccia chiede:
 
 ```js
-// modifica/eliminazione consentite solo nello stato iniziale
-if (request.status !== "in_attesa") {
+// modifica/eliminazione consentite al richiedente solo nello stato iniziale
+if (ticket.status !== "open") {
   return res.status(409).json({
     ok: false,
-    error: "La richiesta è già stata valutata e non può essere modificata",
+    error: "Il ticket è già stato preso in carico e non può più essere modificato",
   });
 }
 ```
 
-```js
-// validazioni sulle date (nelle rotte che le impostano/modificano)
-if (evaluated_at && new Date(evaluated_at) < new Date(request.created_at)) {
-  return res.status(400).json({
-    ok: false,
-    error: "La data di valutazione non può precedere la data di inserimento",
-  });
-}
-if (paid_at && new Date(paid_at) < new Date(request.evaluated_at)) {
-  return res.status(400).json({
-    ok: false,
-    error: "La data di liquidazione non può precedere la data di approvazione",
-  });
-}
-```
+I vincoli sulle date (presa in carico ≥ apertura, risoluzione ≥ presa in
+carico) sono garantiti a livello DB dai `CHECK` di `hd_tickets`; usando
+`new Date().toISOString()` per gli istanti sono automaticamente coerenti.
 
-Nel frontend gli stati si mostrano con `Badge` (pattern in `Users.jsx`) e i
-bottoni azione si mostrano/nascondono in base a stato e ruolo — ma la regola
-vera resta quella del server.
+Nel frontend gli stati si mostrano con `Badge` e i bottoni azione
+(prendi in carico / risolvi / rifiuta) si mostrano in base a stato e ruolo — ma
+la regola vera resta quella del server.
 
 ---
 
@@ -379,59 +440,79 @@ vera resta quella del server.
 
 supabase-js non fa `GROUP BY`: con i volumi di un esame la strategia più
 semplice è **aggregare in JavaScript nel controller** — si riusa il model con
-i filtri già pronti (ricetta 2) e non serve toccare il DB.
+i filtri già pronti (ricetta 2). Riservata ai tecnici (`isAdmin`).
+
+La traccia chiede, per **mese e categoria**: ticket ricevuti, risolti,
+rifiutati; tempo medio di risoluzione (apertura → risoluzione); totale ore
+lavorate. Filtri per mese, categoria, priorità e tecnico.
 
 ```js
-// controllers/stats.controller.js
+// controllers/stats.controller.js  (montato su /statistiche)
 const express = require("express");
 const protect = require("../middleware/auth");
 const isAdmin = require("../middleware/isAdmin");
-const { findAllRequests } = require("../models/request.model");
+const { findAllTickets } = require("../models/ticket.model");
 
 const router = express.Router();
 
-// GET /stats/requests?month=2026-05&categoryId=…&userId=…  (solo admin)
-router.get("/requests", protect, isAdmin, async (req, res) => {
+// GET /statistiche/ticket?mese=2026-05&categoriaId=…&priorita=…&tecnicoId=…  (solo tecnico)
+router.get("/ticket", protect, isAdmin, async (req, res) => {
   try {
-    const { month, categoryId, userId } = req.query;
-    const requests = await findAllRequests({ month, categoryId, userId });
+    const { mese, categoriaId, priorita, tecnicoId } = req.query;
+    const tickets = await findAllTickets({
+      month: mese,
+      categoryId: categoriaId,
+      priority: priorita,
+      technicianId: tecnicoId,
+    });
 
-    // groupBy mese+categoria
+    // groupBy mese(apertura) + categoria
     const groups = new Map();
-    for (const r of requests) {
-      const month = r.expense_date.slice(0, 7); // "YYYY-MM"
-      const key = `${month}|${r.category?.id}`;
+    for (const t of tickets) {
+      const mese = t.created_at.slice(0, 7); // "YYYY-MM"
+      const key = `${mese}|${t.category?.id}`;
 
       if (!groups.has(key)) {
         groups.set(key, {
-          month,
-          category: r.category?.description ?? "—",
-          count: 0,
-          totalRequested: 0,
-          totalApproved: 0,
-          totalPaid: 0,
+          mese,
+          categoria: t.category?.description ?? "—",
+          numeroAperti: 0,       // ricevuti nel periodo
+          numeroRisolti: 0,
+          numeroRifiutati: 0,
+          _sommaOreRisoluzione: 0,
+          totaleOreLavorate: 0,
         });
       }
 
       const g = groups.get(key);
-      g.count += 1;
-      g.totalRequested += Number(r.amount);
-      if (["approvata", "liquidata"].includes(r.status)) {
-        g.totalApproved += Number(r.amount);
+      g.numeroAperti += 1;
+      if (t.status === "resolved") {
+        g.numeroRisolti += 1;
+        g.totaleOreLavorate += Number(t.worked_hours ?? 0);
+        if (t.resolved_at) {
+          const ore = (new Date(t.resolved_at) - new Date(t.created_at)) / 3_600_000;
+          g._sommaOreRisoluzione += ore;
+        }
       }
-      if (r.status === "liquidata") {
-        g.totalPaid += Number(r.amount);
+      if (t.status === "rejected") {
+        g.numeroRifiutati += 1;
       }
     }
 
-    // ordinamento stabile per mese poi categoria
-    const stats = [...groups.values()].sort(
-      (a, b) => a.month.localeCompare(b.month) || a.category.localeCompare(b.category),
-    );
+    // tempo medio di risoluzione + pulizia campi interni
+    const stats = [...groups.values()]
+      .map(({ _sommaOreRisoluzione, ...g }) => ({
+        ...g,
+        tempoMedioRisoluzioneOre: g.numeroRisolti
+          ? Number((_sommaOreRisoluzione / g.numeroRisolti).toFixed(1))
+          : 0,
+        totaleOreLavorate: Number(g.totaleOreLavorate.toFixed(1)),
+      }))
+      .sort((a, b) => a.mese.localeCompare(b.mese) || a.categoria.localeCompare(b.categoria));
 
     return res.status(200).json({ ok: true, stats });
   } catch (err) {
-    console.error("GET REQUEST STATS ERROR:", err);
+    console.error("GET TICKET STATS ERROR:", err);
     return res.status(500).json({ ok: false, error: "Errore interno del server" });
   }
 });
@@ -439,14 +520,29 @@ router.get("/requests", protect, isAdmin, async (req, res) => {
 module.exports = router;
 ```
 
-Montare in `server.js` (`app.use("/stats", …)`), documentare in
+Esempio di riga restituita (allineato alla traccia):
+
+```json
+{
+  "mese": "2026-05",
+  "categoria": "Rete",
+  "numeroAperti": 12,
+  "numeroRisolti": 9,
+  "numeroRifiutati": 1,
+  "tempoMedioRisoluzioneOre": 18.5,
+  "totaleOreLavorate": 27.0
+}
+```
+
+Montare in `server.js` (`app.use("/statistiche", …)`), documentare in
 `ENDPOINTS.md` e nella collection Postman. La pagina di riepilogo è una
 normale pagina con `FilterBar` + `useFetch` + `DataTable` (le righe aggregate
-hanno bisogno di una chiave: usare `render` e `key: "month"` oppure
-aggiungere `id: key` agli oggetti).
+hanno bisogno di una chiave: usare `render` e `key: "mese"` oppure aggiungere
+`id: key` agli oggetti). I dati possono essere anche mostrati graficamente
+(opzionale).
 
 > Alternativa per volumi reali: una **view Postgres** creata su Supabase
-> (`create view … as select date_trunc(…), sum(…) … group by …`) letta dal
+> (`create view … as select date_trunc(…), count(…) … group by …`) letta dal
 > model come una tabella normale con `.from("nome_view")`. Più efficiente ma
 > è un oggetto in più da gestire sul DB: per una prova d'esame l'aggregazione
 > in JS è più che sufficiente.

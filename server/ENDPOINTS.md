@@ -15,12 +15,17 @@ Se aggiungi o modifichi un endpoint, aggiorna anche la collection.
 
 ## Credenziali di test
 
-Create dal seed (`npm run seed` da dentro `server/`, rilanciabile senza duplicati):
+Create dal seed (`npm run seed` da dentro `server/`, rilanciabile senza duplicati).
+Ricorda: `isAdmin = true` → **Tecnico di supporto**, `isAdmin = false` → **Utente richiedente**.
 
-| Ruolo  | Email             | Password     |
-|--------|-------------------|--------------|
-| Admin  | `admin@test.it`   | `Admin123!`  |
-| Utente | `utente@test.it`  | `Utente123!` |
+| Ruolo               | `isAdmin` | Email             | Password     |
+|---------------------|-----------|-------------------|--------------|
+| Tecnico di supporto | `true`    | `admin@test.it`   | `Admin123!`  |
+| Utente richiedente  | `false`   | `utente@test.it`  | `Utente123!` |
+
+> Quando il seed verrà esteso con i dati di dominio (categorie + ticket con stati
+> diversi), converrà usare email più parlanti (es. `tecnico@test.it`,
+> `richiedente@test.it`) e più utenti per coprire filtri e statistiche.
 
 ## Convenzioni generali
 
@@ -28,7 +33,7 @@ Create dal seed (`npm run seed` da dentro `server/`, rilanciabile senza duplicat
 - **Formato**: tutte le richieste e risposte usano JSON (`Content-Type: application/json`).
 - **Formato risposta**: ogni risposta ha la forma `{ "ok": true, ... }` in caso di successo, oppure `{ "ok": false, "error": <string | string[]> }` in caso di errore.
 - **Autenticazione**: le rotte protette richiedono l'header `Authorization: Bearer <token>`. Il token JWT si ottiene tramite `POST /auth/login` o `POST /auth/register`.
-- **Autorizzazione admin**: alcune rotte (tutte sotto `/users`) richiedono che l'utente autenticato abbia `isAdmin: true` (middleware `isAdmin` in `middleware/isAdmin.js`, da usare dopo `protect`).
+- **Autorizzazione tecnico**: alcune rotte richiedono che l'utente autenticato sia un tecnico di supporto (`isAdmin: true`) — middleware `isAdmin` in `middleware/isAdmin.js`, da usare dopo `protect`. Riguardano la gestione utenti (`/users`) e, nel dominio, presa in carico / risoluzione / rifiuto dei ticket e le statistiche.
 
 ### Errori comuni di autenticazione
 
@@ -36,7 +41,7 @@ Create dal seed (`npm run seed` da dentro `server/`, rilanciabile senza duplicat
 |--------|--------|
 | `401 Non autenticato` | Header `Authorization` assente o non nel formato `Bearer <token>` |
 | `401 Token non valido o scaduto` | Token JWT non verificabile o scaduto |
-| `403 Accesso non autorizzato` | Rotta admin richiesta da un utente non admin |
+| `403 Accesso non autorizzato` | Rotta riservata ai tecnici richiesta da un utente non tecnico |
 | `404 Rotta non trovata` | Endpoint inesistente |
 | `500 Errore interno del server` | Errore non gestito lato server |
 
@@ -63,10 +68,11 @@ Autenticazione utente. **Pubblica.**
 ### `POST /auth/register`
 Registrazione pubblica. **Pubblica.**
 
-> ⚠️ **Attenzione**: la rotta accetta `isAdmin` senza alcun vincolo, quindi
-> chiunque può registrarsi come amministratore. Scelta voluta per il template
-> (comodità in sviluppo/demo): nei progetti derivati va protetta (es. codice di
-> registrazione, whitelist, o rimozione del campo).
+> ℹ️ **Ruolo in registrazione**: la rotta accetta `isAdmin` (`true` = Tecnico di
+> supporto, `false` = Utente richiedente) senza vincoli, quindi l'utente sceglie
+> il proprio ruolo. La traccia lo consente esplicitamente per la simulazione
+> ("*è ammesso che la registrazione consenta di scegliere il ruolo*"), così un
+> valutatore può testare entrambi i ruoli. Da segnalare nella consegna.
 
 **Body**
 | Campo | Tipo | Obbligatorio | Note |
@@ -76,7 +82,7 @@ Registrazione pubblica. **Pubblica.**
 | `email` | string | sì | |
 | `password` | string | sì | |
 | `repeatPassword` | string | sì | deve coincidere con `password` |
-| `isAdmin` | boolean | no | default `false`; se presente deve essere un booleano |
+| `isAdmin` | boolean | no | ruolo: `true` = Tecnico, `false` = Richiedente. Default `false`; se presente deve essere un booleano |
 
 **Validazioni**: nome e cognome conformi a `validateName` (mai vuoti o solo spazi); formato email valido; password conforme alle regole di `validatePassword`; `password === repeatPassword`; `isAdmin` (se presente) booleano.
 
@@ -106,7 +112,7 @@ Logout. Stateless: risponde semplicemente con successo (l'invalidazione del toke
 
 ## Users — `/users`
 
-Tutte le rotte richiedono autenticazione **e privilegi di amministratore** (`isAdmin: true`).
+Tutte le rotte richiedono autenticazione **e ruolo tecnico** (`isAdmin: true`). Gestione degli account (ereditata dal template): utile per amministrare tecnici e richiedenti.
 
 ### `GET /users`
 Elenco di tutti gli utenti.
@@ -169,6 +175,138 @@ Elimina un utente.
 
 **Risposte**
 - `200` → `{ ok: true, user }`
+
+---
+
+## Dominio — rotte da implementare (blueprint)
+
+> ⚠️ Le rotte qui sotto **non sono ancora implementate**: sono il progetto delle
+> API di dominio da costruire seguendo [`../ADDING_A_RESOURCE.md`](../ADDING_A_RESOURCE.md)
+> e [`../PATTERNS.md`](../PATTERNS.md). Man mano che vengono realizzate, spostarle
+> tra le rotte attive e aggiornare la collection Postman.
+>
+> **Convenzione path**: per coerenza con `/auth` e `/users`, i router di dominio
+> si montano senza prefisso `/api` (`/ticket`, `/categorie`, `/statistiche`). La
+> traccia li elenca come `/api/ticket`, `/api/categorie`, `/api/statistiche/...`:
+> le due forme sono funzionalmente equivalenti.
+
+### Categorie — `/categorie`
+
+#### `GET /categorie`
+Elenco delle categorie disponibili. **Protetta.**
+
+**Risposte**
+- `200` → `{ ok: true, categories }`
+
+### Ticket — `/ticket`
+
+Tutte protette (`protect`). Le rotte azione (presa in carico / risoluzione /
+rifiuto) richiedono anche il ruolo tecnico (`isAdmin`).
+
+#### `GET /ticket`
+Elenco ticket. Il richiedente vede **solo i propri**; il tecnico vede **tutti**.
+
+**Query (filtri, opzionali)**
+| Param | Valori | Note |
+|-------|--------|------|
+| `status` | `open` \| `in_progress` \| `resolved` \| `rejected` | |
+| `categoryId` | uuid | |
+| `priority` | `low` \| `medium` \| `high` \| `urgent` | |
+| `month` | `YYYY-MM` | filtra sulla data di apertura |
+| `requesterId` | uuid | **solo tecnico**; per il richiedente è forzato a sé stesso |
+
+**Risposte**
+- `200` → `{ ok: true, tickets }`
+
+#### `GET /ticket/:id`
+Dettaglio di un ticket. Il richiedente può vedere solo i propri (404 altrimenti).
+
+**Risposte**
+- `200` → `{ ok: true, ticket }`
+- `404` → ticket non trovato / non accessibile
+
+#### `POST /ticket`
+Crea un ticket. `requester_id` dal token, `status` iniziale `open`.
+
+**Body**
+| Campo | Tipo | Obbligatorio | Note |
+|-------|------|--------------|------|
+| `title` | string | sì | non solo spazi |
+| `description` | string | sì | non vuota |
+| `category_id` | uuid | sì | categoria esistente |
+| `priority` | string | sì | tra le priorità previste |
+
+**Risposte**
+- `201` → `{ ok: true, ticket }`
+- `400` → validazione fallita (titolo/descrizione/categoria/priorità)
+
+#### `PUT /ticket/:id`
+Modifica un ticket. Consentita **solo al richiedente proprietario** e **solo se
+`status = open`** (non ancora preso in carico).
+
+**Body**: come `POST` (campi modificabili: `title`, `description`, `category_id`, `priority`).
+
+**Risposte**
+- `200` → `{ ok: true, ticket }`
+- `400` → validazione fallita
+- `404` → ticket non trovato / non proprio
+- `409` → ticket già preso in carico (non modificabile)
+
+#### `DELETE /ticket/:id`
+Elimina un ticket. Consentita **solo al richiedente proprietario** e **solo se
+`status = open`**.
+
+**Risposte**
+- `200` → `{ ok: true, ticket }`
+- `404` → ticket non trovato / non proprio
+- `409` → ticket già preso in carico (non eliminabile)
+
+#### `PUT /ticket/:id/prendi-in-carico`
+Presa in carico. **Solo tecnico.** `open → in_progress`; assegna il ticket al
+tecnico e imposta `taken_in_charge_at`.
+
+**Risposte**
+- `200` → `{ ok: true, ticket }`
+- `409` → transizione non ammessa (ticket non `open`)
+
+#### `PUT /ticket/:id/risolvi`
+Risoluzione. **Solo tecnico.** `in_progress → resolved`; imposta `resolved_at`.
+
+**Body**
+| Campo | Tipo | Obbligatorio | Note |
+|-------|------|--------------|------|
+| `worked_hours` | number | sì | > 0 |
+| `resolution_note` | string | no | se presente, non solo spazi |
+
+**Risposte**
+- `200` → `{ ok: true, ticket }`
+- `400` → ore lavorate ≤ 0 / nota non valida
+- `409` → transizione non ammessa (ticket non `in_progress`)
+
+#### `PUT /ticket/:id/rifiuta`
+Rifiuto. **Solo tecnico.** `open | in_progress → rejected`.
+
+**Body**
+| Campo | Tipo | Obbligatorio | Note |
+|-------|------|--------------|------|
+| `rejection_reason` | string | sì | motivazione valorizzata |
+
+**Risposte**
+- `200` → `{ ok: true, ticket }`
+- `400` → motivazione mancante
+- `409` → transizione non ammessa (ticket già terminale)
+
+### Statistiche — `/statistiche`
+
+#### `GET /statistiche/ticket`
+Riepilogo aggregato per **mese e categoria**. **Solo tecnico.**
+
+**Query (filtri, opzionali)**: `mese` (`YYYY-MM`), `categoriaId`, `priorita`, `tecnicoId`.
+
+**Risposte**
+- `200` → `{ ok: true, stats }` — ogni riga:
+  `{ mese, categoria, numeroAperti, numeroRisolti, numeroRifiutati, tempoMedioRisoluzioneOre, totaleOreLavorate }`
+- `403` → utente non tecnico
 
 ---
 

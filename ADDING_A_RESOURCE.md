@@ -1,9 +1,9 @@
 # Aggiungere una risorsa al gestionale
 
-Ricetta per aggiungere una nuova risorsa (es. "clienti", "ordini", "spese")
-partendo dal template. I passi sono sempre gli stessi; l'esempio vivo del
-pattern completo è la risorsa **Utenti** (`server/controllers/users.controller.js`
-+ `client/src/pages/Users.jsx`).
+Ricetta per aggiungere una nuova risorsa (in questo progetto: **categorie** e
+**ticket**) partendo dall'infrastruttura del template. I passi sono sempre gli
+stessi; l'esempio vivo del pattern CRUD completo è la risorsa **Utenti**
+(`server/controllers/users.controller.js` + `client/src/pages/Users.jsx`).
 
 > Se la risorsa ha relazioni (FK), filtri, un owner, stati o statistiche,
 > le ricette pronte sono in [`PATTERNS.md`](PATTERNS.md).
@@ -11,8 +11,8 @@ pattern completo è la risorsa **Utenti** (`server/controllers/users.controller.
 ## 1. Database (Supabase)
 
 1. Leggi `server/database/schema.md` e `schema.sql`.
-2. Crea la tabella su Supabase seguendo le convenzioni: prefisso del progetto,
-   `id uuid` PK con `gen_random_uuid()`, `created_at timestamptz default now()`.
+2. Crea la tabella su Supabase seguendo le convenzioni: prefisso `hd_`, nomi in
+   inglese, `id uuid` PK con `gen_random_uuid()`, `created_at timestamptz default now()`.
 3. Aggiorna **sia** `schema.sql` **sia** `schema.md`, e registra la modifica in
    `server/database/CHANGELOG.md` con il numero progressivo (`#00N`).
 
@@ -56,9 +56,11 @@ pattern completo è la risorsa **Utenti** (`server/controllers/users.controller.
 5. **Label tabella** — mappa `<RISORSA>_COLUMN_LABELS` in
    `src/constants/columnLabels.js`.
 
-## Personalizzare il template (una tantum, a inizio progetto)
+## Personalizzazione del progetto (già impostata / da rifinire)
 
-- Nome e logo app: `client/src/constants/app.js` + `<title>` in `client/index.html`.
-- Prefisso tabelle: scegli il prefisso del progetto e allinea le costanti
-  `TABLE_NAME` nei models (vedi `server/database/schema.md`).
+- Nome e logo app: `client/src/constants/app.js` (già "Help Desk") + `<title>` in `client/index.html`.
+- Prefisso tabelle: questo progetto usa `hd_` con nomi in inglese. Allinea le
+  costanti `TABLE_NAME` nei models al nome della tabella (vedi
+  `server/database/schema.md`); il model utenti eredita ancora `T_Users` dal
+  template e va portato a `hd_users`.
 - `.env` di entrambi i lati (copiando i `.env.example`).
