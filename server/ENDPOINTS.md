@@ -30,6 +30,10 @@ PUT /ticket/:id/rifiuta
 
 GET /api/categorie
 
+## STATS
+
+GET /api/statistiche/ticket?mese=2026-05&categoriaId=1&tecnicoId=3
+
 ## UTILITY
 
 GET /health
