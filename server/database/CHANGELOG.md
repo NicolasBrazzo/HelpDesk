@@ -84,3 +84,32 @@ create index if not exists idx_tickets_created_at on "hd_tickets"("created_at");
 > `TABLE_NAME = "T_Users"` (in `server/models/user.model.js` e
 > `server/database/seed.js`). Va allineato a `"hd_users"` quando si costruiscono
 > i model/seed di questo progetto.
+
+---
+
+## #002 — Popolamento iniziale di `hd_categories`
+
+Nessuna modifica di schema: inserite le 6 categorie previste da
+[`schema.md`](./schema.md) ("Valori iniziali (seed)"). La tabella era vuota e
+`POST /ticket` non può funzionare senza almeno una categoria, dato che il
+controller valida l'esistenza di `category_id`.
+
+L'`upsert` su `description` (colonna `UNIQUE`) rende l'operazione ripetibile
+senza creare duplicati.
+
+```sql
+insert into "hd_categories" ("description")
+values
+    ('Hardware'),
+    ('Software'),
+    ('Rete'),
+    ('Account e accessi'),
+    ('Posta elettronica'),
+    ('Altro')
+on conflict ("description") do nothing;
+```
+
+> 📌 **Da fare:** replicare questo inserimento in `server/database/seed.js` (con
+> i ticket di esempio nei vari stati) così che `npm run seed` ricostruisca da
+> solo i dati di dominio. Al momento le righe esistono su Supabase ma non sono
+> riproducibili dal seed.

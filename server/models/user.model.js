@@ -1,6 +1,6 @@
 const supabase = require("../config/db_connection");
 
-const TABLE_NAME = "T_Users";
+const TABLE_NAME = "hd_users";
 
 // get all users
 const findAllUsers = async () => {

@@ -5,12 +5,36 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
-    { "key": "token", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticketId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    }
   ],
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
@@ -34,17 +58,29 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"first_name\": \"Mario\",\n    \"last_name\": \"Rossi\",\n    \"email\": \"mario.rossi@test.it\",\n    \"password\": \"Password123!\",\n    \"repeatPassword\": \"Password123!\",\n    \"isAdmin\": false\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
             },
             "description": "Registrazione pubblica. Salva automaticamente il token restituito."
           }
@@ -67,17 +103,29 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"email\": \"admin@test.it\",\n    \"password\": \"Admin123!\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "Login. Salva automaticamente il token nella variabile della collection: le altre richieste lo usano via Bearer."
           }
@@ -89,8 +137,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/auth/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
             },
             "description": "Dati dell'utente autenticato (dal token). Protetta."
           }
@@ -98,13 +151,20 @@
         {
           "name": "Logout",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "logout"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
             },
             "description": "Logout stateless: risponde ok, l'invalidazione del token è a carico del client."
           }
@@ -122,8 +182,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
             }
           }
         },
@@ -134,9 +198,20 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", ":id"],
-              "variable": [{ "key": "id", "value": "", "description": "uuid dell'utente" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "uuid dell'utente"
+                }
+              ]
             }
           }
         },
@@ -144,15 +219,24 @@
           "name": "Crea utente",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"first_name\": \"Luigi\",\n    \"last_name\": \"Verdi\",\n    \"email\": \"luigi.verdi@test.it\",\n    \"password\": \"Password123!\",\n    \"isAdmin\": false\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
             }
           }
         },
@@ -160,16 +244,32 @@
           "name": "Aggiorna utente",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"first_name\": \"Luigi\",\n    \"last_name\": \"Verdi\",\n    \"email\": \"luigi.verdi@test.it\",\n    \"isAdmin\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/users/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", ":id"],
-              "variable": [{ "key": "id", "value": "", "description": "uuid dell'utente" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "uuid dell'utente"
+                }
+              ]
             },
             "description": "password opzionale: aggiungerla al body solo per cambiarla."
           }
@@ -181,10 +281,294 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", ":id"],
-              "variable": [{ "key": "id", "value": "", "description": "uuid dell'utente" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "uuid dell'utente"
+                }
+              ]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ticket",
+      "description": "Rotte protette. Il richiedente vede/modifica solo i propri ticket (404 altrimenti) e solo finche sono `open` (409 altrimenti). Le rotte azione (prendi-in-carico / risolvi / rifiuta) richiedono un token da tecnico (isAdmin: true). Imposta le variabili di collection `categoryId` e `ticketId` prima di usarle.",
+      "item": [
+        {
+          "name": "Lista ticket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ticket",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket"
+              ]
+            },
+            "description": "Il richiedente vede solo i propri, il tecnico li vede tutti."
+          }
+        },
+        {
+          "name": "Lista ticket (con filtri)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ticket?status=open&priority=high&categoryId={{categoryId}}&month=2026-07&requesterId=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "open",
+                  "description": "open | in_progress | resolved | rejected"
+                },
+                {
+                  "key": "priority",
+                  "value": "high",
+                  "description": "low | medium | high | urgent"
+                },
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}",
+                  "description": "uuid categoria"
+                },
+                {
+                  "key": "month",
+                  "value": "2026-07",
+                  "description": "YYYY-MM, sulla data di apertura"
+                },
+                {
+                  "key": "requesterId",
+                  "value": "",
+                  "description": "uuid richiedente — SOLO tecnico",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Tutti i filtri sono opzionali. `requesterId` e ignorato per i richiedenti (forzato a se stessi)."
+          }
+        },
+        {
+          "name": "Dettaglio ticket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ticket/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "uuid del ticket"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crea ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n        \"title\": \"PC non si accende\",\n        \"description\": \"Il computer dell ufficio 2 non da segni di vita.\",\n        \"category_id\": \"{{categoryId}}\",\n        \"priority\": \"high\"\n    }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ticket",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket"
+              ]
+            },
+            "description": "`requester_id` viene dal token e `status` e forzato a `open`: non vanno passati nel body."
+          }
+        },
+        {
+          "name": "Aggiorna ticket",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n        \"title\": \"PC non si accende (aggiornato)\",\n        \"description\": \"Aggiornamento: non si accende nemmeno con un altro cavo.\",\n        \"category_id\": \"{{categoryId}}\",\n        \"priority\": \"urgent\"\n    }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ticket/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "uuid del ticket"
+                }
+              ]
+            },
+            "description": "Solo il richiedente proprietario e solo se il ticket e ancora `open`."
+          }
+        },
+        {
+          "name": "Elimina ticket",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ticket/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "uuid del ticket"
+                }
+              ]
+            },
+            "description": "Solo il richiedente proprietario e solo se il ticket e ancora `open`."
+          }
+        },
+        {
+          "name": "Prendi in carico (solo tecnico)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ticket/:id/prendi-in-carico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket",
+                ":id",
+                "prendi-in-carico"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "uuid del ticket"
+                }
+              ]
+            },
+            "description": "`open` -> `in_progress`. Assegna il ticket al tecnico autenticato e imposta `taken_in_charge_at`."
+          }
+        },
+        {
+          "name": "Risolvi (solo tecnico)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n        \"worked_hours\": 2.5,\n        \"resolution_note\": \"Sostituito alimentatore.\"\n    }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ticket/:id/risolvi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket",
+                ":id",
+                "risolvi"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "uuid del ticket"
+                }
+              ]
+            },
+            "description": "`in_progress` -> `resolved`. `worked_hours` obbligatorie (> 0, max 9999.99). `resolution_note` opzionale."
+          }
+        },
+        {
+          "name": "Rifiuta (solo tecnico)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n        \"rejection_reason\": \"Richiesta non di competenza dell assistenza tecnica.\"\n    }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ticket/:id/rifiuta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ticket",
+                ":id",
+                "rifiuta"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "uuid del ticket"
+                }
+              ]
+            },
+            "description": "`open` | `in_progress` -> `rejected`. `rejection_reason` obbligatoria."
           }
         }
       ]
@@ -195,13 +579,19 @@
         {
           "name": "Health check",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             },
             "description": "Verifica che il server sia su. Pubblica."
           }
