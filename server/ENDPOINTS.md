@@ -26,6 +26,10 @@ PUT /ticket/:id/prendi-in-carico
 PUT /ticket/:id/risolvi
 PUT /ticket/:id/rifiuta
 
+## CATEGORIES
+
+GET /api/categorie
+
 ## UTILITY
 
 GET /health
