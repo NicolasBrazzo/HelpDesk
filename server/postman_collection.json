@@ -327,7 +327,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/ticket?status=open&priority=high&categoryId={{categoryId}}&month=2026-07&requesterId=",
+              "raw": "{{baseUrl}}/ticket?status=open&priority=high&categoryId={{categoryId}}&month=2026-07&page=1&limit=20&sort=created_at&order=desc",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -353,17 +353,49 @@
                 {
                   "key": "month",
                   "value": "2026-07",
-                  "description": "YYYY-MM, sulla data di apertura"
+                  "description": "YYYY-MM, sulla data di apertura (ha precedenza su dateFrom/dateTo)"
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "",
+                  "description": "periodo: data apertura >= (ISO). Ignorato se month e valido",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "",
+                  "description": "periodo: data apertura <= (ISO). Ignorato se month e valido",
+                  "disabled": true
                 },
                 {
                   "key": "requesterId",
                   "value": "",
                   "description": "uuid richiedente — SOLO tecnico",
                   "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "pagina (1-based), default 1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "elementi per pagina, default 20, max 100"
+                },
+                {
+                  "key": "sort",
+                  "value": "created_at",
+                  "description": "created_at | priority | status | taken_in_charge_at | resolved_at"
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "description": "asc | desc"
                 }
               ]
             },
-            "description": "Tutti i filtri sono opzionali. `requesterId` e ignorato per i richiedenti (forzato a se stessi)."
+            "description": "Elenco paginato con filtri (standard FILTERS_BE.md). Tutti i parametri sono opzionali. `month` ha precedenza sul periodo `dateFrom`/`dateTo`. `requesterId` e onorato solo per i tecnici: per un richiedente e ignorato (vede solo i propri ticket). Risposta: { data, pagination: { total, page, limit, totalPages } }."
           }
         },
         {

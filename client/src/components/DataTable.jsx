@@ -27,8 +27,11 @@ const HEADER_CLASS =
  * data: array di item; la riga usa item.id || item._id come chiave
  *
  * actions: { onEdit(item), onDelete(item) } — se presente aggiunge la colonna Azioni
+ *
+ * onRowClick(item): rende l'intera riga cliccabile (es. apertura dettagli).
+ *   Le celle con `onClick` proprio e la colonna Azioni fermano la propagazione.
  */
-export const DataTable = ({ columns, data, actions }) => {
+export const DataTable = ({ columns, data, actions, onRowClick }) => {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState("desc");
 
@@ -91,19 +94,30 @@ export const DataTable = ({ columns, data, actions }) => {
           {sortedData.map((item) => (
             <tr
               key={item.id || item._id}
-              className="hover:bg-muted/30 transition-colors"
+              onClick={onRowClick ? () => onRowClick(item) : undefined}
+              className={`hover:bg-muted/30 transition-colors${
+                onRowClick ? " cursor-pointer" : ""
+              }`}
             >
               {columns.map((col) => (
                 <td
                   key={col.key}
                   className={cellClass(col)}
-                  onClick={col.onClick ? () => col.onClick(item) : undefined}
+                  onClick={
+                    col.onClick
+                      ? (e) => {
+                          // La cella ha un suo click: non far scattare anche onRowClick
+                          e.stopPropagation();
+                          col.onClick(item);
+                        }
+                      : undefined
+                  }
                 >
                   {col.render ? col.render(item) : item[col.key]}
                 </td>
               ))}
               {actions && (
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
                     {actions.onEdit && (
                       <Button

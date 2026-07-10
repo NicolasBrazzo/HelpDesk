@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LayoutDashboard, UserPlus, LogOut } from "lucide-react";
+import { LayoutDashboard, UserPlus, LogOut, Tickets } from "lucide-react";
 import { APP_NAME, APP_LOGO } from "../constants/app";
 
 // Voci di menu: aggiungere qui le pagine delle risorse del progetto.
 const MENU_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: UserPlus, label: "Utenti", path: "/users" },
+  { icon: Tickets, label: "Tickets", path: "/tickets" },
 ];
 
 export const Sidebar = () => {

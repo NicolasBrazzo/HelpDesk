@@ -9,6 +9,7 @@ import { AppLayout } from "./layouts/AppLayout.jsx";
 import { ToastContainer } from "react-toastify";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Users } from "./pages/Users.jsx";
+import { Tickets } from "./pages/Tickets.jsx";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/users" element={<Users />} />
+                  <Route path="/tickets" element={<Tickets />} />
                 </Route>
               </Route>
             </Routes>

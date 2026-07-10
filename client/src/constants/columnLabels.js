@@ -8,3 +8,12 @@ export const USERS_COLUMN_LABELS = {
   last_name: "Cognome",
   created_at: "Creato il",
 };
+
+export const TICKETS_COLUMN_LABELS = {
+  title: "Titolo",
+  description: "Descrizione",
+  category: "Categoria",
+  priority: "Priorità",
+  status: "Stato",
+  created_at: "Aperto il",
+};
