@@ -510,17 +510,17 @@
         {
           "name": "Prendi in carico (solo tecnico)",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/ticket/:id/prendi-in-carico",
+              "raw": "{{baseUrl}}/ticket/:id/take-in-charge",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "ticket",
                 ":id",
-                "prendi-in-carico"
+                "take-in-charge"
               ],
               "variable": [
                 {

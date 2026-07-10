@@ -22,7 +22,7 @@ GET /ticket/:id
 POST /ticket
 PUT /ticket/:id
 DELETE /ticket/:id
-PUT /ticket/:id/prendi-in-carico
+PATCH /ticket/:id/take-in-charge
 PUT /ticket/:id/risolvi
 PUT /ticket/:id/rifiuta
 

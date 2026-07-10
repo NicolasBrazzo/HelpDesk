@@ -3,12 +3,14 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const protect = require("../middleware/auth");
+const isAdmin = require("../middleware/isAdmin");
 const {
   findAllTickets,
   findTicketById,
   createNewTicket,
   updateTicketById,
   deleteTicketById,
+  updateTicketStatusById,
 } = require("../models/tickets.model");
 const { validateName } = require("../utils/validateName");
 const router = express.Router();
@@ -245,6 +247,120 @@ router.put("/:id", protect, async (req, res) => {
     });
   } catch (err) {
     console.error("PUT TICKET ERROR:", err);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Errore interno del server",
+    });
+  }
+});
+
+// PATCH Prendi in carico — transizione open → in_progress (solo tecnico).
+// Assegna il ticket al tecnico autenticato e registra la data di presa in carico.
+router.patch("/:id/take-in-charge", protect, isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const ticket = await findTicketById(id);
+    if (!ticket) {
+      return res.status(404).json({
+        ok: false,
+        error: "Ticket non trovato",
+      });
+    }
+
+    // La presa in carico è ammessa solo da uno stato 'open'
+    if (ticket.status !== "open") {
+      return res.status(409).json({
+        ok: false,
+        error: "Solo un ticket aperto può essere preso in carico",
+      });
+    }
+
+    const updatedTicket = await updateTicketById(id, {
+      status: "in_progress",
+      assigned_technician_id: req.user.sub,
+      taken_in_charge_at: new Date().toISOString(),
+    });
+
+    return res.status(200).json({
+      ok: true,
+      ticket: updatedTicket,
+    });
+  } catch (err) {
+    console.error("TAKE TICKET IN CHARGE ERROR:", err);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Errore interno del server",
+    });
+  }
+});
+
+// PATCH Update ticker a risolto
+router.patch("/:id/resolve", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if(!id) {
+      return res.status(400).json({
+        ok: false,
+        error: "ID del ticket mancante",
+      });
+  }
+
+    const ticket = await findTicketById(id);
+    if (!ticket) {
+      return res.status(404).json({
+        ok: false,
+        error: "Ticket non trovato",
+      });
+    }
+
+    const updatedTicket = await updateTicketStatusById(id, "resolved");
+    return res.status(200).json({
+      ok: true,
+      ticket: updatedTicket,
+    });
+
+  } catch (err) {
+    console.error("CHANGE TICKET TO RESOLVED ERROR:", err);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Errore interno del server",
+    });
+  }
+});
+
+// PATCH Update ticket to rifiutato
+router.patch("/:id/reject", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if(!id) {
+      return res.status(400).json({
+        ok: false,
+        error: "ID del ticket mancante",
+      });
+  }
+
+    const ticket = await findTicketById(id);
+    if (!ticket) {
+      return res.status(404).json({
+        ok: false,
+        error: "Ticket non trovato",
+      });
+    }
+
+    const updatedTicket = await updateTicketStatusById(id, "rejected");
+    return res.status(200).json({
+      ok: true,
+      ticket: updatedTicket,
+    });
+
+  } catch (err) {
+    console.error("CHANGE TICKET TO REJECTED ERROR:", err);
 
     return res.status(500).json({
       ok: false,

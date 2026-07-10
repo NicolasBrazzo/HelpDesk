@@ -83,6 +83,22 @@ const updateTicketById = async (id, ticketData) => {
   return data;
 };
 
+// edit ticket status by id
+const updateTicketStatusById = async (id, status) => {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .update({ status })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error("DATABASE_EDIT_TICKET_ERROR");
+  }
+
+  return data;
+};
+
 // delete ticket by id
 const deleteTicketById = async (id) => {
   const { data, error } = await supabase
@@ -105,5 +121,6 @@ module.exports = {
   findAllTickets,
   findTicketById,
   updateTicketById,
+  updateTicketStatusById,
   deleteTicketById,
 };
