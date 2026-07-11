@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, UserCheck } from "lucide-react";
 
 import Loader from "@/components/Loader";
 import Modal from "@/components/Modal";
@@ -12,10 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useFetch";
 import { useMutation } from "@/hooks/useMutation";
-import { fetchTickets, createTicket, updateTicket, deleteTicket } from "@/services/ticketService";
+import {
+  fetchTickets,
+  createTicket,
+  updateTicket,
+  deleteTicket,
+  takeTicketInCharge,
+} from "@/services/ticketService";
 import { fetchCategories } from "@/services/categoriesService";
 import { validateName } from "@/utils/validators";
-import { showSuccess } from "@/utils/toast";
+import { showSuccess, showError } from "@/utils/toast";
 import { TICKETS_COLUMN_LABELS } from "@/constants/columnLabels";
 import {
   PRIORITY_OPTIONS,
@@ -69,7 +75,7 @@ const buildColumns = (categoryMap) => [
 ];
 
 export const Tickets = () => {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState(null);
   const [viewingTicket, setViewingTicket] = useState(null);
@@ -142,6 +148,36 @@ export const Tickets = () => {
       refetch();
     },
   });
+
+  // Presa in carico: solo il tecnico, solo su ticket ancora aperti (open → in_progress).
+  const { mutate: takeInCharge } = useMutation(
+    (ticketId) => takeTicketInCharge(ticketId),
+    {
+      onSuccess: () => {
+        showSuccess("Ticket preso in carico");
+        refetch();
+      },
+      // Il backend rifiuta con 409 se il ticket non è più 'open' (es. già preso
+      // in carico da un altro tecnico): mostro il messaggio invece di ignorarlo.
+      onError: (message) => showError(message),
+    },
+  );
+
+  const handleTakeInCharge = async (ticket) => {
+    const ticketId = ticket.id || ticket._id;
+    if (!ticketId) return;
+
+    const confirmTake = window.confirm(
+      `Vuoi prendere in carico il ticket "${ticket.title}"?`,
+    );
+    if (!confirmTake) return;
+
+    try {
+      await takeInCharge(ticketId);
+    } catch {
+      // errore gestito dall'hook (toast in onError)
+    }
+  };
 
   const handleDelete = async (ticket) => {
     const ticketId = ticket.id || ticket._id;
@@ -226,6 +262,16 @@ export const Tickets = () => {
           data={tickets}
           onRowClick={(ticket) => setViewingTicket(ticket)}
           actions={{
+            extra: [
+              {
+                key: "take-in-charge",
+                icon: UserCheck,
+                label: "Prendi in carico",
+                // Azione riservata al tecnico e visibile solo sui ticket aperti
+                isVisible: (ticket) => user?.isAdmin && ticket.status === "open",
+                onClick: handleTakeInCharge,
+              },
+            ],
             onEdit: (ticket) => {
               setEditingTicket(ticket);
               resetSaveError();

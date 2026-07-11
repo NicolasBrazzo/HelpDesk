@@ -26,7 +26,14 @@ const HEADER_CLASS =
  *
  * data: array di item; la riga usa item.id || item._id come chiave
  *
- * actions: { onEdit(item), onDelete(item) } — se presente aggiunge la colonna Azioni
+ * actions: { onEdit(item), onDelete(item), extra } — se presente aggiunge la colonna Azioni
+ *   extra: array di azioni specifiche della risorsa, mostrate prima di modifica/elimina
+ *     - key            chiave React del bottone
+ *     - icon           componente icona (es. da lucide-react)
+ *     - label          testo di title/aria-label
+ *     - variant        variante del Button (default "ghost")
+ *     - isVisible(item)  se presente, l'azione compare solo quando ritorna true
+ *     - onClick(item)  handler dell'azione
  *
  * onRowClick(item): rende l'intera riga cliccabile (es. apertura dettagli).
  *   Le celle con `onClick` proprio e la colonna Azioni fermano la propagazione.
@@ -119,6 +126,23 @@ export const DataTable = ({ columns, data, actions, onRowClick }) => {
               {actions && (
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
+                    {(actions.extra || [])
+                      .filter((action) => !action.isVisible || action.isVisible(item))
+                      .map((action) => {
+                        const Icon = action.icon;
+                        return (
+                          <Button
+                            key={action.key}
+                            variant={action.variant || "ghost"}
+                            size="icon-sm"
+                            title={action.label}
+                            aria-label={action.label}
+                            onClick={() => action.onClick(item)}
+                          >
+                            <Icon />
+                          </Button>
+                        );
+                      })}
                     {actions.onEdit && (
                       <Button
                         variant="ghost"

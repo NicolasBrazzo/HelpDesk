@@ -41,6 +41,16 @@ export const updateTicket = async (id, payload) => {
   }
 };
 
+// Presa in carico: transizione open → in_progress, riservata al tecnico.
+export const takeTicketInCharge = async (id) => {
+  try {
+    const res = await api.patch(`/tickets/${id}/take-in-charge`);
+    return res.data.ticket;
+  } catch (err) {
+    throw new Error(err.message);
+  }
+};
+
 export const deleteTicket = async (id) => {
   try {
     const res = await api.delete(`/tickets/${id}`);

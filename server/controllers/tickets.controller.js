@@ -168,7 +168,6 @@ router.post("/", protect, async (req, res) => {
 });
 
 // PUT Update ticket by ID — modifica i campi editabili (titolo, descrizione,
-// categoria, priorità). I cambi di stato hanno endpoint dedicati.
 router.put("/:id", protect, async (req, res) => {
   try {
     const { id } = req.params;
@@ -256,7 +255,6 @@ router.put("/:id", protect, async (req, res) => {
 });
 
 // PATCH Prendi in carico — transizione open → in_progress (solo tecnico).
-// Assegna il ticket al tecnico autenticato e registra la data di presa in carico.
 router.patch("/:id/take-in-charge", protect, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
